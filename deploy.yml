@@ -7,7 +7,7 @@
     project_name: "nextjs-app"
     project_path: "/home/quentin.cialone-gcp/{{ project_name }}"
     node_version: "18.x"
-    remote_user: "quentin.cialone-gcp"
+    app_user: "quentin.cialone-gcp"
     
   tasks:
     - name: Mettre à jour le cache apt
@@ -70,8 +70,8 @@
     - name: Changer le propriétaire du répertoire
       file:
         path: "{{ project_path }}"
-        owner: "{{ remote_user }}"
-        group: "{{ remote_user }}"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
         recurse: yes
 
     - name: Supprimer node_modules et package-lock.json
@@ -87,13 +87,13 @@
       npm:
         path: "{{ project_path }}"
         state: present
-      become_user: "{{ remote_user }}"
+      become_user: "{{ app_user }}"
 
     - name: Générer le build de production
       command: npm run build
       args:
         chdir: "{{ project_path }}"
-      become_user: "{{ remote_user }}"
+      become_user: "{{ app_user }}"
 
     - name: Arrêter l'application Next.js si elle est en cours d'exécution
       shell: |
@@ -110,7 +110,7 @@
 
           [Service]
           Type=simple
-          User={{ remote_user }}
+          User={{ app_user }}
           WorkingDirectory={{ project_path }}
           ExecStart=/usr/bin/npm start
           Restart=on-failure
