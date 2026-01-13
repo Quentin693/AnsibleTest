@@ -1,0 +1,149 @@
+---
+- hosts: webserver
+  become: yes
+  vars:
+    # Modifiez ces variables selon votre projet
+    github_repo: "https://github.com/VOTRE_USERNAME/VOTRE_REPO.git"
+    project_name: "nextjs-app"
+    project_path: "/home/quentin.cialone-gcp/{{ project_name }}"
+    node_version: "18.x"
+    remote_user: "quentin.cialone-gcp"
+    
+  tasks:
+    - name: Mettre à jour le cache apt
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Installer les prérequis système
+      apt:
+        name:
+          - git
+          - curl
+          - build-essential
+        state: present
+
+    - name: Vérifier si Node.js est installé
+      command: node --version
+      register: node_installed
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Télécharger et installer Node.js
+      shell: |
+        curl -fsSL https://deb.nodesource.com/setup_{{ node_version }} | sudo -E bash -
+        sudo apt-get install -y nodejs
+      when: node_installed.rc != 0
+
+    - name: Vérifier les versions installées
+      shell: |
+        node -v
+        npm -v
+      register: versions
+      changed_when: false
+
+    - name: Afficher les versions
+      debug:
+        msg: "{{ versions.stdout_lines }}"
+
+    - name: Vérifier si le répertoire du projet existe
+      stat:
+        path: "{{ project_path }}"
+      register: project_dir
+
+    - name: Cloner le projet depuis GitHub
+      git:
+        repo: "{{ github_repo }}"
+        dest: "{{ project_path }}"
+        version: main
+        force: yes
+      when: not project_dir.stat.exists
+
+    - name: Mettre à jour le projet depuis GitHub
+      git:
+        repo: "{{ github_repo }}"
+        dest: "{{ project_path }}"
+        version: main
+        force: yes
+      when: project_dir.stat.exists
+
+    - name: Changer le propriétaire du répertoire
+      file:
+        path: "{{ project_path }}"
+        owner: "{{ remote_user }}"
+        group: "{{ remote_user }}"
+        recurse: yes
+
+    - name: Supprimer node_modules et package-lock.json
+      file:
+        path: "{{ project_path }}/{{ item }}"
+        state: absent
+      loop:
+        - node_modules
+        - package-lock.json
+        - .next
+
+    - name: Installer les dépendances npm
+      npm:
+        path: "{{ project_path }}"
+        state: present
+      become_user: "{{ remote_user }}"
+
+    - name: Générer le build de production
+      command: npm run build
+      args:
+        chdir: "{{ project_path }}"
+      become_user: "{{ remote_user }}"
+
+    - name: Arrêter l'application Next.js si elle est en cours d'exécution
+      shell: |
+        pkill -f "npm start" || true
+        pkill -f "next start" || true
+      ignore_errors: yes
+
+    - name: Créer un fichier systemd pour Next.js
+      copy:
+        content: |
+          [Unit]
+          Description=Next.js Application
+          After=network.target
+
+          [Service]
+          Type=simple
+          User={{ remote_user }}
+          WorkingDirectory={{ project_path }}
+          ExecStart=/usr/bin/npm start
+          Restart=on-failure
+          Environment=NODE_ENV=production
+          Environment=PORT=3000
+
+          [Install]
+          WantedBy=multi-user.target
+        dest: /etc/systemd/system/nextjs-app.service
+        mode: '0644'
+
+    - name: Recharger systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: Activer et démarrer le service Next.js
+      systemd:
+        name: nextjs-app
+        enabled: yes
+        state: restarted
+
+    - name: Attendre que l'application démarre
+      wait_for:
+        port: 3000
+        delay: 5
+        timeout: 60
+
+    - name: Vérifier que l'application répond
+      uri:
+        url: http://localhost:3000
+        status_code: 200
+      retries: 3
+      delay: 5
+      register: result
+      until: result.status == 200
+
