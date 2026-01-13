@@ -1,0 +1,50 @@
+name: Deploy Next.js App
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v3
+
+      - name: Installer Ansible
+        run: |
+          sudo apt update
+          sudo apt install -y ansible
+
+      - name: Créer le répertoire SSH
+        run: mkdir -p ~/.ssh
+
+      - name: Configurer la clé SSH
+        run: |
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
+
+      - name: Créer le fichier inventory.ini
+        run: |
+          cat > inventory.ini << EOF
+          [webserver]
+          ${{ secrets.SERVER_IP }} ansible_user=${{ secrets.REMOTE_USER }} ansible_ssh_private_key_file=~/.ssh/id_rsa
+          EOF
+
+      - name: Exécuter Ansible
+        run: |
+          ansible-playbook -i inventory.ini deploy.yml
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: False
+
+      - name: Notification de succès
+        if: success()
+        run: echo "✅ Déploiement réussi sur le serveur !"
+
+      - name: Notification d'échec
+        if: failure()
+        run: echo "❌ Le déploiement a échoué. Vérifiez les logs."
+
