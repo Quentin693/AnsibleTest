@@ -43,7 +43,7 @@ export default function Home() {
 
         <div className={styles.status}>
           <p>✅ Déploiement réussi !</p>
-          <p>Version: 1.0.0</p>
+          <p>Version: 2.0.0 - CI/CD actif ! 🚀</p>
         </div>
       </main>
 
