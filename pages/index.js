@@ -45,6 +45,11 @@ export default function Home() {
           <p>✅ Déploiement réussi !</p>
           <p>Version: 2.0.0 - CI/CD actif ! 🚀</p>
         </div>
+        <div className={styles.contactLink}>
+          <a href="/contact" className={styles.contactButton}>
+            📧 Contactez-nous
+          </a>
+        </div>
       </main>
 
       <footer className={styles.footer}>
