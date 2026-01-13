@@ -34,9 +34,13 @@ jobs:
           ${{ secrets.SERVER_IP }} ansible_user=${{ secrets.REMOTE_USER }} ansible_ssh_private_key_file=~/.ssh/id_rsa
           EOF
 
+      - name: Tester la connexion SSH
+        run: |
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${{ secrets.REMOTE_USER }}@${{ secrets.SERVER_IP }} "echo 'Connexion SSH OK'"
+
       - name: Exécuter Ansible
         run: |
-          ansible-playbook -i inventory.ini deploy.yml
+          ansible-playbook -i inventory.ini deploy.yml -vvv
         env:
           ANSIBLE_HOST_KEY_CHECKING: False
 
